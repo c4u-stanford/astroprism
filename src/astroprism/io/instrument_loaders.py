@@ -11,7 +11,7 @@ import jax.numpy as jnp
 from astropy.io import fits
 from astropy.wcs import WCS
 
-# === Main (Functions) =============================================================================
+# === Main =========================================================================================
 
 # TODO: also need things like position angle, units etc. - maybe also have an hdf5 loader
 
