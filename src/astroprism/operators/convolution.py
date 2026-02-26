@@ -44,7 +44,6 @@ class Convolver:
 
 # === Utilities ====================================================================================
 
-
 def gaussian_filter1d_jax(array: jnp.ndarray, sigma: float, axis: int = 0, truncate: float = 4.0) -> jnp.ndarray:
     """1D Gaussian filter along specified axis."""
 
