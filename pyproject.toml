@@ -76,6 +76,7 @@ ignore = ["F722"]  # Allow jaxtyping shape annotations
 
 [tool.ruff.lint.isort]
 known-first-party = ["astroprism"]
+force-sort-within-sections = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
