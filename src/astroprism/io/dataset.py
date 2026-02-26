@@ -21,7 +21,7 @@ from astropy.wcs.utils import proj_plane_pixel_scales
 
 from astroprism.io.instrument_loaders import _INSTRUMENT_LOADERS
 
-# === Main (Classes) ===============================================================================
+# === Main =========================================================================================
 
 class BaseDataset(ABC):
     """Abstract base class for datasets."""
@@ -297,8 +297,6 @@ class MultiInstrumentDataset(BaseDataset):
         lines.append(f"Pixel scales: {self.pixel_scales}")
 
         return "\n".join(lines) + "\n"
-
-# === Main (Functions) =============================================================================
 
 def load_dataset(path: str, instrument: str, extension: str = "fits") -> SingleInstrumentDataset:
     # Get instrument loader
