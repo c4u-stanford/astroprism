@@ -1,0 +1,104 @@
+[build-system]
+requires = ["setuptools>=61", "setuptools_scm>=8.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "astroprism"
+dynamic = ["version"]
+description = "A probabilistic forward modeling framework for multi-wavelength astronomical imaging"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Steven Dillmann", email = "stevendi@stanford.edu"}]
+maintainers = [{name = "Steven Dillmann", email = "stevendi@stanford.edu"}]
+keywords = [
+    "astronomy",
+    "astrophysics",
+    "bayesian inference",
+    "gaussian processes",
+    "information field theory",
+    "probabilistic modeling",
+    "multi-wavelength imaging",
+    "forward modeling",
+]
+dependencies = [
+    "numpy>=1.24.0",
+    "scipy>=1.10.0",
+    "jax>=0.4.0",
+    "jaxlib>=0.4.0",
+    "nifty8>=8.0",
+    "astropy>=5.0",
+    "matplotlib>=3.5.0",
+    "pyyaml>=6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/StevenDillmann/astroprism"
+Repository = "https://github.com/StevenDillmann/astroprism"
+"Bug Tracker" = "https://github.com/StevenDillmann/astroprism/issues"
+
+[project.optional-dependencies]
+viz = [
+    "matplotlib>=3.5.0",
+    "plotly>=5.0.0",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.1.0",
+    "pre-commit>=3.0",
+    "jupyter>=1.0",
+    "ipykernel>=6.0",
+]
+docs = [
+    "sphinx>=7.0",
+    "furo",
+    "myst-parser>=1.0",
+    "sphinx-copybutton",
+    "nbsphinx>=0.9",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["astroprism*"]
+
+[tool.setuptools_scm]
+version_file = "src/astroprism/_version.py"
+fallback_version = "0.1.dev0"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["F722"]  # Allow jaxtyping shape annotations
+
+[tool.ruff.lint.isort]
+known-first-party = ["astroprism"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = ["-v", "--strict-markers", "--strict-config"]
+markers = [
+    "unit: fast unit tests with no external dependencies",
+    "integration: integration tests requiring data files",
+    "slow: slow tests (deselect with '-m \"not slow\"')",
+]
+
+[tool.coverage.run]
+source = ["src/astroprism"]
+omit = ["*/tests/*", "*/__pycache__/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
