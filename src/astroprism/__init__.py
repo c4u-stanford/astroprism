@@ -1,3 +1,5 @@
+"""AstroPrism: Bayesian inference for multi-channel astronomical imaging."""
+
 import jax
 
 # Enable 64-bit precision for scientific accuracy
@@ -8,4 +10,12 @@ try:
 except ImportError:
     __version__ = "0.1.dev0"
 
-__all__ = ["__version__"]
+from astroprism import inference, io, models, operators
+
+__all__ = [
+    "__version__",
+    "inference",
+    "io",
+    "models",
+    "operators",
+]
