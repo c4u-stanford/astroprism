@@ -19,8 +19,8 @@ def _load_jwst(path: str) -> tuple[jnp.ndarray, WCS, jnp.ndarray]:
     """Load data, WCS, and PSF from a JWST FITS file.
     """
     with fits.open(path) as hdul:
-        data = hdul[1].data.astype(np.float64)
-        wcs = WCS(hdul[1].header)
+        data = hdul[0].data.astype(np.float64)
+        wcs = WCS(hdul[0].header)
         psf = hdul["PSF"].data.astype(np.float64)
     return data, wcs, psf
 

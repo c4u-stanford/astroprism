@@ -10,7 +10,7 @@ import jax.numpy as jnp
 import nifty8.re as jft
 from astropy.wcs import WCS
 
-from astroprism.data import BaseDataset
+from astroprism.io import BaseDataset
 from astroprism.operators import Convolver, Reprojector
 
 # === Main =========================================================================================

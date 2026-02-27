@@ -9,7 +9,7 @@ Gaussian likelihood construction for Bayesian inference.
 import jax.numpy as jnp
 import nifty8.re as jft
 
-from astroprism.data import BaseDataset
+from astroprism.io import BaseDataset
 
 # === Main =========================================================================================
 

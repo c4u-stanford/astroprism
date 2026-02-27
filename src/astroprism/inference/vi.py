@@ -115,9 +115,10 @@ def run_inference(
     n_iterations: int = 10, 
     n_samples: int = 6, 
     output_directory: str = "vi_results",
-    seed: int = 42
+    seed: int = 42,
+    verbosity: int = 1
 ):
     """Helper function to run VI in one line."""
     vi = VariationalInference(likelihood, seed=seed)
-    samples, state = vi.run(n_iterations, n_samples, output_directory)
+    samples, state = vi.run(n_iterations, n_samples, output_directory, verbosity=verbosity)
     return samples, state
