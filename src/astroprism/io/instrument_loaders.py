@@ -17,10 +17,18 @@ from astropy.wcs import WCS
 
 def _load_jwst(path: str) -> tuple[jnp.ndarray, WCS, jnp.ndarray]:
     """Load data, WCS, and PSF from a JWST FITS file.
+
+    Supports two layouts:
+    - Primary HDU contains data (e.g. MIRI cutouts)
+    - Primary HDU is empty, data is in the 'SCI' extension (e.g. NIRCam pipeline products)
     """
     with fits.open(path) as hdul:
-        data = hdul[0].data.astype(np.float64)
-        wcs = WCS(hdul[0].header)
+        if hdul[0].data is not None:
+            data = hdul[0].data.astype(np.float64)
+            wcs = WCS(hdul[0].header)
+        else:
+            data = hdul["SCI"].data.astype(np.float64)
+            wcs = WCS(hdul["SCI"].header)
         psf = hdul["PSF"].data.astype(np.float64)
     return data, wcs, psf
 
