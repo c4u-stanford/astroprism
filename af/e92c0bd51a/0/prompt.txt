@@ -1,0 +1,124 @@
+i remember i once tried to fit data from different instruments together here, can you somehow find this here?
+
+---
+
+hold on let's try to recreate 08_full_pipeline.ipynb but with data from different instruments - create a 09 ipynb and load jwst miri and jwst nircam together
+
+---
+
+i dont have nircam cutout, just use nircam
+
+---
+
+are you done?
+
+---
+
+---------------------------------------------------------------------------
+AttributeError                            Traceback (most recent call last)
+Cell In[2], line 9
+      4 # Load Multi-Instrument Dataset
+      5 paths = {
+      6     "JWST_MIRI":   "../data/tutorial/jwst_miri_cutout/",
+      7     "JWST_NIRCAM": "../data/tutorial/jwst_nircam/",
+      8 }
+----> 9 dataset = load_multiple_datasets(paths_dict=paths, extension="fits")
+     10 print(dataset.summary())
+     12 # Plot Data — one panel per channel, labelled by instrument:channel
+
+File ~/Desktop/projects/AstroGP/astroprism/src/astroprism/io/dataset.py:333, in load_multiple_datasets(paths_dict, extension)
+    331 instrument_datasets = {}
+    332 for instrument, path in paths_dict.items():
+--> 333     instrument_datasets[instrument] = load_dataset(path=path, instrument=instrument, extension=extension)
+    334 return MultiInstrumentDataset(instrument_datasets=instrument_datasets)
+
+File ~/Desktop/projects/AstroGP/astroprism/src/astroprism//dataset.py:322, in load_dataset(path, instrument, extension)
+    320 for file in files:
+    321     if file.endswith(extension):
+--> 322         data, wcs, psf = loader(file)
+    323         data_list.append(data)
+    324         wcs_list.append(wcs)
+
+File ~/Desktop/projects/AstroGP/astroprism/src/astroprism/io/instrument_loaders.py:22, in _load_jwst(path)
+     19 """Load data, WCS, and PSF from a JWST FITS file.
+     20 """
+     21 with fits.open(path) as hdul:
+---> 22     data = hdul[0].data.astype(np.float64)
+     23     wcs = WCS(hdul[0].header)
+     24     psf = hdul["PSF"].data.astype(np.float64)
+
+AttributeError: 'NoneType' object has no attribute 'astype' get this in the first notebook
+
+---
+
+great that worked, add and commit the change
+
+---
+
+cool everything seems to work up until Step 6....check the error: /opt/homebrew/Cellar/python@3.14/3.14.0_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/genericpath.py:39: RuntimeWarning: bool is used as a file descriptor
+  st = os.stat(path)
+OPTIMIZE_KL: Starting 0001
+Starting VI optimization: 10 iterations, 2 samples.
+/Users/steven/Desktop/projects/AstroGP/astroprism/.venv/lib/python3.14/site-packages/jax/_src/interpreters/mlir.py:1167: UserWarning: A large amount of constants were captured during lowering (2.05GB total). If this is intentional, disable this warning by setting JAX_CAPTURED_CONSTANTS_WARN_BYTES=-1. To obtain a report of where these constants were encountered, set JAX_CAPTURED_CONSTANTS_REPORT_FRAMES=-1.
+  warnings.warn(message) or rather warning but this isdefinitely not okay, it would make the package useless
+
+---
+
+what changed now
+
+---
+
+/opt/homebrew/Cellar/python@3.14/3.14.0_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/genericpath.py:39: RuntimeWarning: bool is used as a file descriptor
+  st = os.stat(path)
+OPTIMIZE_KL: Starting 0001
+Starting VI optimization: 10 iterations, 2 samples.
+E0328 15:26:58.707425 3216270 slow_operation_alarm.cc:73] Constant folding an instruction is taking > 1s:
+
+  %convert_element_type.502 = s32[34183923]{0} convert(%constant.2028), metadata={op_name="jit(draw_linear_residual)/jvp()/convert_element_type" stack_frame_id=422}
+
+This isn't necessarily a bug; constant-folding is inherently a trade-off between compilation time and speed at runtime. XLA has some guards that attempt to keep constant folding from taking too long, but fundamentally you'll always be able to come up with an input program that takes a long time.
+
+If you'd like to file a bug, run with envvar XLA_FLAGS=--xla_dump_to=/tmp/foo and attach the results.
+E0328 15:26:59.940620 3216140 slow_operation_alarm.cc:140] The operation took 2.240375s
+Constant folding an instruction is taking > 1s:
+
+  %convert_element_type.502 = s32[34183923]{0} convert(%constant.2028), metadata={op_name="jit(draw_linear_residual)/jvp()/convert_element_type" stack_frame_id=422}
+
+This isn't necessarily a bug; constant-folding is inherently a trade-off between compilation time and speed at runtime. XLA has some guards that attempt to keep constant folding from taking too long, but fundamentally you'll always be able to come up with an input program that takes a long time.
+
+If you'd like to file a bug, run with envvar XLA_FLAGS=--xla_dump_to=/tmp/foo and attach the results. i get this now
+
+---
+
+maybe for quick testing lets only take rhe first two channels from miri and first two from nircam. you can add a line to remove them from the data in the notebook?
+
+---
+
+/opt/homebrew/Cellar/python@3.14/3.14.0_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/genericpath.py:39: RuntimeWarning: bool is used as a file descriptor
+  st = os.stat(path)
+OPTIMIZE_KL: Starting 0001
+Starting VI optimization: 10 iterations, 2 samples. its taking ages unfortunately
+
+---
+
+yeah we can crop just for testing
+
+---
+
+[Image #3]  the data should be cropped in the center, its fine for miri but for nircam it doesnt seem to be right
+
+---
+
+# Plot the cropped data in that cell
+
+---
+
+i changed it to crop_size = 1200 but it doesnt do amything
+
+---
+
+plot in sky projection too
+
+---
+
+insetad of trimming it to same pixel size, can i trim it to the same portion of the sky? that would mean nircam can have more pixels etc
