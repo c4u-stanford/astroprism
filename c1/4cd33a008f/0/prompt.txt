@@ -48,3 +48,7 @@ File ~/Desktop/projects/AstroGP/astroprism/src/astroprism/io/instrument_loaders.
      24     psf = hdul["PSF"].data.astype(np.float64)
 
 AttributeError: 'NoneType' object has no attribute 'astype' get this in the first notebook
+
+---
+
+great that worked, add and commit the change
