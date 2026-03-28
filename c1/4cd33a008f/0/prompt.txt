@@ -1,0 +1,50 @@
+i remember i once tried to fit data from different instruments together here, can you somehow find this here?
+
+---
+
+hold on let's try to recreate 08_full_pipeline.ipynb but with data from different instruments - create a 09 ipynb and load jwst miri and jwst nircam together
+
+---
+
+i dont have nircam cutout, just use nircam
+
+---
+
+are you done?
+
+---
+
+---------------------------------------------------------------------------
+AttributeError                            Traceback (most recent call last)
+Cell In[2], line 9
+      4 # Load Multi-Instrument Dataset
+      5 paths = {
+      6     "JWST_MIRI":   "../data/tutorial/jwst_miri_cutout/",
+      7     "JWST_NIRCAM": "../data/tutorial/jwst_nircam/",
+      8 }
+----> 9 dataset = load_multiple_datasets(paths_dict=paths, extension="fits")
+     10 print(dataset.summary())
+     12 # Plot Data — one panel per channel, labelled by instrument:channel
+
+File ~/Desktop/projects/AstroGP/astroprism/src/astroprism/io/dataset.py:333, in load_multiple_datasets(paths_dict, extension)
+    331 instrument_datasets = {}
+    332 for instrument, path in paths_dict.items():
+--> 333     instrument_datasets[instrument] = load_dataset(path=path, instrument=instrument, extension=extension)
+    334 return MultiInstrumentDataset(instrument_datasets=instrument_datasets)
+
+File ~/Desktop/projects/AstroGP/astroprism/src/astroprism//dataset.py:322, in load_dataset(path, instrument, extension)
+    320 for file in files:
+    321     if file.endswith(extension):
+--> 322         data, wcs, psf = loader(file)
+    323         data_list.append(data)
+    324         wcs_list.append(wcs)
+
+File ~/Desktop/projects/AstroGP/astroprism/src/astroprism/io/instrument_loaders.py:22, in _load_jwst(path)
+     19 """Load data, WCS, and PSF from a JWST FITS file.
+     20 """
+     21 with fits.open(path) as hdul:
+---> 22     data = hdul[0].data.astype(np.float64)
+     23     wcs = WCS(hdul[0].header)
+     24     psf = hdul["PSF"].data.astype(np.float64)
+
+AttributeError: 'NoneType' object has no attribute 'astype' get this in the first notebook
