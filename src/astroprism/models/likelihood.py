@@ -6,6 +6,7 @@ Gaussian likelihood construction for Bayesian inference.
 
 # === Setup ========================================================================================
 
+import numpy as np
 import jax.numpy as jnp
 import nifty8.re as jft
 
@@ -26,9 +27,7 @@ class LikelihoodModel(jft.Model):
         total_pixels = 0
         
         for m in mask:
-            # Note: m should be a concrete array (numpy/jax) here
-            # ravel() ensures we get flat indices
-            indices = jnp.where(m.ravel())[0]
+            indices = np.where(np.asarray(m).ravel())[0].astype(np.int32)
             self.valid_indices_list.append(indices)
             total_pixels += len(indices)
 
@@ -57,7 +56,7 @@ def build_likelihood(dataset, observation_model, mask):
     likelihood_model = LikelihoodModel(observation_model, mask)
     
     # 2. Prepare the data (same masking logic)
-    data_flat = jnp.concatenate([d.ravel()[m.ravel()] for d, m in zip(dataset.data, mask)])
+    data_flat = np.concatenate([np.asarray(d).ravel()[np.asarray(m).ravel()] for d, m in zip(dataset.data, mask)])
     
     # 3. Build NIFTy Likelihood
     return jft.VariableCovarianceGaussian(data_flat).amend(likelihood_model)

@@ -11,7 +11,6 @@ import numpy as np
 from astropy.wcs import WCS
 from astropy.wcs.utils import pixel_to_pixel
 from jax.scipy.ndimage import map_coordinates
-import jax
 
 # === Main =========================================================================================
 
@@ -56,14 +55,7 @@ class Reprojector:
         Returns:
             Reprojected signal with shape `output_shape`.
         """
-        # FIXME: not sure about this
-        grid = jax.lax.dynamic_slice(
-            self.pixel_grid,
-            start_indices=(0, 0, 0),
-            slice_sizes=self.pixel_grid.shape
-        )
-        grid = jax.lax.stop_gradient(grid)
-        return map_coordinates(s, grid, order=self.order, mode=self.mode, cval=self.cval)
+        return map_coordinates(s, self.pixel_grid, order=self.order, mode=self.mode, cval=self.cval)
 
 
     def _precompute_grid(self, input_wcs: WCS, output_wcs: WCS, output_shape: tuple[int, int]) -> jnp.ndarray:
@@ -90,5 +82,6 @@ class Reprojector:
         grid_y = y_in.reshape(ny, nx)
         grid_x = x_in.reshape(ny, nx)
 
-        # Convert to JAX array
-        return jnp.array(np.stack([grid_y, grid_x]))
+        # Keep as numpy — JAX only captures jax.Array as XLA constants, not numpy arrays.
+        # Converting to jnp here would embed this large grid as a constant on every JIT compile.
+        return np.stack([grid_y, grid_x])
