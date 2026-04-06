@@ -1,0 +1,95 @@
+# =============================================================================
+# astroprism default configuration
+#
+# All values here are used as defaults. Override only what you need in your
+# own config file or by modifying cfg after load_config().
+#
+# Prior params format:
+#   Shared across all channels:  [mean, std]
+#   Per-channel:                 [[mean, std], [mean, std], ...]
+# =============================================================================
+
+# ── Data ──────────────────────────────────────────────────────────────────────
+data:
+  path:       null          # path to data directory — must be set by user
+  instrument: null          # e.g. JWST_MIRI, JWST_NIRCAM, HERSCHEL_PACS
+  extension:  "fits"
+
+# ── GP prior (shared spatial structure across channels) ───────────────────────
+gp:
+  offset_mean:    0.0
+  offset_std:     [1.0,  0.1]   # zero-mode prior
+  fluctuations:   [1.0,  0.1]   # amplitude of spatial fluctuations
+  loglogavgslope: [-3.0, 1.0]   # power-law slope of the power spectrum
+  flexibility:    [0.5,  0.1]   # deviation from pure power law
+
+# ── Mixing matrix (cross-channel correlations) ────────────────────────────────
+mixture:
+  mix_mode: "full"              # "full" or "diag"
+  mix_full:
+    prior_type:   "normal"
+    prior_params: [0.0, 1.0]
+  mix_offset:
+    prior_type:   "normal"
+    prior_params: [0.0, 1.0]
+  # Used only when mix_mode: "diag"
+  mix_diag:
+    prior_type:   "normal"
+    prior_params: [0.0, 1.0]
+  mix_off_diag:
+    prior_type:   "normal"
+    prior_params: [0.0, 1.0]
+
+# ── Per-channel learnable params ──────────────────────────────────────────────
+#
+# mode options:
+#   sample         — full posterior (default)
+#   point_estimate — MAP estimate, not sampled
+#   constant       — frozen at init value
+#
+# freeze_until: N  — frozen as constant for iters 0..N-1, then transitions to mode
+# freeze_until: 0  — never frozen (active from iter 0)
+# =============================================================================
+params:
+  background_std:
+    prior_type:   "lognormal"
+    prior_params: [0.01, 0.1]   # broadcast to all channels
+    mode:         "sample"
+    freeze_until: 0
+
+  poisson_scale:
+    prior_type:   "lognormal"
+    prior_params: [1.0, 0.5]
+    mode:         "sample"
+    freeze_until: 0
+
+  psf_sigma:
+    prior_type:   "lognormal"
+    prior_params: [1.0, 0.1]
+    mode:         "point_estimate"
+    freeze_until: 0
+
+  psf_rotation:
+    prior_type:   "normal"
+    prior_params: [0.0, 0.1]
+    mode:         "point_estimate"
+    freeze_until: 0
+
+# ── Inference ─────────────────────────────────────────────────────────────────
+inference:
+  n_iterations:     20
+  n_samples:        4
+  output_directory: "output/run_001"
+  seed:             42
+  sample_mode:      "linear_resample"   # linear_resample | nonlinear_resample | nonlinear_update
+  resume:           true
+
+# ── Solver ────────────────────────────────────────────────────────────────────
+solver:
+  ls_absdelta:  1.0e-3
+  ls_maxiter:   1000
+  nls_xtol:     1.0e-2
+  nls_maxiter:  5
+  kl_absdelta:  1.0e-2
+  kl_xtol:      1.0e-8
+  kl_maxiter:   100

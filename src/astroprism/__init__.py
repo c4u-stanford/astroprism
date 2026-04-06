@@ -10,7 +10,8 @@ try:
 except ImportError:
     __version__ = "0.1.dev0"
 
-from astroprism import inference, io, models, operators
+from astroprism import inference, io, models, operators, utils
+from astroprism.utils import load_config
 
 __all__ = [
     "__version__",
@@ -18,4 +19,6 @@ __all__ = [
     "io",
     "models",
     "operators",
+    "utils",
+    "load_config",
 ]
