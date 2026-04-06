@@ -8,6 +8,7 @@ Noise model for multi-channel astronomical imaging.
 
 import jax.numpy as jnp
 import nifty8.re as jft
+from astroprism.models.priors import build_prior
 
 # === Main =========================================================================================
 
@@ -26,18 +27,12 @@ class NoiseModel:
     def __init__(
         self,
         n_channels: int,
-        background_std: tuple[float, float] = (0.01, 0.1),
-        poisson_scale: tuple[float, float] = (1.0, 0.5),
+        background_std: dict,
+        poisson_scale: dict,
     ):
         self.n_channels = n_channels
-        # TODO: make this flexible (could be a jft prior too..., do this for all models/priors in other files too)
-        # TODO 2: also rename the priors to _prior or so to distinguish from values
-        self.background_std = jft.LogNormalPrior(
-            background_std[0], background_std[1], shape=(n_channels,), name="background_std"
-        )
-        self.poisson_scale = jft.LogNormalPrior(
-            poisson_scale[0], poisson_scale[1], shape=(n_channels,), name="poisson_scale"
-        )
+        self.background_std = build_prior("background_std", background_std, (n_channels,))
+        self.poisson_scale  = build_prior("poisson_scale",  poisson_scale,  (n_channels,))
 
     @property
     def domain(self) -> dict:

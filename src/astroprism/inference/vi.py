@@ -9,91 +9,117 @@ Variational inference using NIFTy8's geometric VI (GeoVI/MGVI).
 import jax
 import jax.numpy as jnp
 import nifty8.re as jft
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional, Tuple, Any, Callable
 
 # === Main =========================================================================================
 
 class VariationalInference:
     """
-    Wrapper for NIFTy8.re Variational Inference (MGVI/GeoVI).
+    Wrapper for NIFTy8.re variational inference (MGVI/GeoVI).
+
+    Supports parameter scheduling via the constants and point_estimates arguments to run():
+    - constants: parameters frozen completely (not optimised)
+    - point_estimates: parameters MAP-estimated rather than sampled
+
+    Both are callables: iteration -> tuple[str].
+
+    Example
+    -------
+    vi = VariationalInference(likelihood, ls_absdelta=1e-3, kl_absdelta=1e-2)
+    samples, state = vi.run(
+        n_iterations=20,
+        n_samples=5,
+        output_directory="output/run_001",
+        constants=lambda i: ("background", "signal_gain") if i < 5 else (),
+    )
     """
-    
+
     def __init__(
-        self, 
-        likelihood: jft.Model, 
-        seed: int = 42
+        self,
+        likelihood: jft.Model,
+        *,
+        seed: int = 42,
+        sample_mode: str = "linear_resample",
+        ls_absdelta: float = 1e-3,
+        ls_maxiter: int = 1000,
+        nls_xtol: float = 1e-3,
+        nls_maxiter: int = 5,
+        kl_absdelta: float = 1e-2,
+        kl_xtol: float = 1e-8,
+        kl_maxiter: int = 100,
     ):
-        """
-        Args:
-            likelihood: The energy model (negative log-likelihood).
-            seed: Random seed for initialization and sampling.
-        """
         self.likelihood = likelihood
-        self.seed = seed
+        self.sample_mode = sample_mode
+        self.ls_absdelta = ls_absdelta
+        self.ls_maxiter = ls_maxiter
+        self.nls_xtol = nls_xtol
+        self.nls_maxiter = nls_maxiter
+        self.kl_absdelta = kl_absdelta
+        self.kl_xtol = kl_xtol
+        self.kl_maxiter = kl_maxiter
+
         self.key = jax.random.PRNGKey(seed)
-        
-        # Initialize parameters using the model's init method
-        # This creates the dictionary of parameters with correct shapes
         self.key, init_key = jax.random.split(self.key)
-        self.init_params = likelihood.init(init_key)
+        self.init_params = {k: jnp.array(v, dtype=jnp.float64) for k, v in likelihood.init(init_key).items()}
 
     def run(
-        self, 
-        n_iterations: int = 10, 
-        n_samples: int = 6, 
+        self,
+        n_iterations: int = 10,
+        n_samples: int = 5,
         output_directory: str = "vi_results",
-        resume: bool = False,
-        verbosity: int = 0
+        resume: bool = True,
+        constants: Optional[Callable[[int], tuple]] = None,
+        point_estimates: Optional[Callable[[int], tuple]] = None,
     ) -> Tuple[Any, Any]:
         """
-        Run the KL optimization loop.
-        
-        Args:
-            n_iterations: Number of global iterations (linear + non-linear updates).
-            n_samples: Number of samples for the KL estimate (GeoVI samples).
-            output_directory: Path to save results/checkpoints.
-            resume: If True, try to resume from output_directory.
-            verbosity: 0 for silent, higher for debug info.
-            
-        Returns:
-            samples: The final samples from the approximate posterior.
-            state: The final optimization state (contains mean, etc).
+        Run the KL optimisation loop.
+
+        Parameters
+        ----------
+        n_iterations : int
+            Number of outer VI iterations.
+        n_samples : int
+            Number of samples per iteration for the KL estimate.
+        output_directory : str
+            Directory for checkpoints and results.
+        resume : bool
+            Resume from existing checkpoint if available. When resuming,
+            NIFTy loads the saved state from output_directory and init_params
+            is ignored.
+        constants : callable(iteration) -> tuple[str], optional
+            Parameters completely frozen at each iteration.
+        point_estimates : callable(iteration) -> tuple[str], optional
+            Parameters MAP-estimated (not sampled) at each iteration.
+
+        Returns
+        -------
+        samples, state
         """
         self.key, opt_key = jax.random.split(self.key)
-        
-        # Standard solver settings for robust convergence
-        # Linear solver (CG) for drawing samples
+
         draw_linear_kwargs = dict(
-            cg_name="linear_solver", 
-            cg_kwargs=dict(absdelta=1e-4, maxiter=100)
+            cg_name="linear_solver",
+            cg_kwargs=dict(absdelta=self.ls_absdelta, maxiter=self.ls_maxiter),
         )
-        
-        # Non-linear solver for maximizing likelihood wrt latent parameters
         nonlinearly_update_kwargs = dict(
             minimize_kwargs=dict(
-                name="nonlinear_solver", 
-                xtol=1e-4, 
-                cg_kwargs=dict(name=None), 
-                maxiter=10
+                name="nonlinear_solver",
+                xtol=self.nls_xtol,
+                cg_kwargs=dict(name=None),
+                maxiter=self.nls_maxiter,
             )
         )
-        
-        # KL minimizer (Newton-CG) for updating the mean
         kl_kwargs = dict(
             minimize=jft.optimize._newton_cg,
             minimize_kwargs=dict(
-                name="kl_minimizer", 
-                xtol=1e-4, 
-                absdelta=1e-4, 
-                cg_kwargs=dict(name=None), 
-                maxiter=10
+                name="kl_minimizer",
+                xtol=self.kl_xtol,
+                absdelta=self.kl_absdelta,
+                cg_kwargs=dict(name=None),
+                maxiter=self.kl_maxiter,
             ),
         )
 
-        if verbosity > 0:
-            print(f"Starting VI optimization: {n_iterations} iterations, {n_samples} samples.")
-
-        # Run NIFTy's optimize_kl
         samples, state = jft.optimize_kl(
             self.likelihood,
             jft.Vector(self.init_params),
@@ -102,23 +128,26 @@ class VariationalInference:
             key=opt_key,
             odir=output_directory,
             resume=resume,
+            sample_mode=self.sample_mode,
             draw_linear_kwargs=draw_linear_kwargs,
             nonlinearly_update_kwargs=nonlinearly_update_kwargs,
-            kl_kwargs=kl_kwargs
+            kl_kwargs=kl_kwargs,
+            constants=constants,
+            point_estimates=point_estimates,
         )
-        
+
         return samples, state
 
 
+# === Utilities ====================================================================================
+
 def run_inference(
-    likelihood: jft.Model, 
-    n_iterations: int = 10, 
-    n_samples: int = 6, 
+    likelihood: jft.Model,
+    n_iterations: int = 10,
+    n_samples: int = 5,
     output_directory: str = "vi_results",
     seed: int = 42,
-    verbosity: int = 1
-):
-    """Helper function to run VI in one line."""
+) -> Tuple[Any, Any]:
+    """Convenience wrapper to run VI in one line with default settings."""
     vi = VariationalInference(likelihood, seed=seed)
-    samples, state = vi.run(n_iterations, n_samples, output_directory, verbosity=verbosity)
-    return samples, state
+    return vi.run(n_iterations, n_samples, output_directory)

@@ -11,6 +11,7 @@ from typing import Any
 import jax
 import jax.numpy as jnp
 import nifty8.re as jft
+from astroprism.models.priors import build_prior
 
 # === Main =========================================================================================
 
@@ -132,10 +133,10 @@ class MixtureGP(jft.Model):
         self,
         spatial_gps: SpatialGP,
         mix_mode: str = "full",
-        mix_diag: tuple[float, float] = (0.0, 1.0),
-        mix_off_diag: tuple[float, float] = (0.0, 1.0),
-        mix_full: tuple[float, float] = (0.0, 1.0),
-        mix_offset: tuple[float, float] = (0.0, 1.0),
+        mix_diag: dict = None,
+        mix_off_diag: dict = None,
+        mix_full: dict = None,
+        mix_offset: dict = None,
         activation: str = "exp",
     ):
         if activation not in self.ACTIVATIONS:
@@ -196,39 +197,19 @@ class MixtureGP(jft.Model):
         return sample
 
     def _build_full_mixing_matrix(self, n_channels, domain, init, mix_full):
-        self.mixing_matrix = jft.NormalPrior(
-            mix_full[0],
-            mix_full[1],
-            shape=(n_channels, n_channels),
-            name="mixture_matrix",
-        )
+        self.mixing_matrix = build_prior("mixture_matrix", mix_full, (n_channels, n_channels))
         return domain | self.mixing_matrix.domain, init | self.mixing_matrix.init
 
     def _build_diag_mixing_matrix(self, n_channels, domain, init, mix_diag, mix_off_diag):
-        self.mixing_diag = jft.NormalPrior(
-            mix_diag[0],
-            mix_diag[1],
-            shape=(n_channels,),
-            name="mixing_diag",
-        )
-        self.mixing_off_diag = jft.NormalPrior(
-            mix_off_diag[0],
-            mix_off_diag[1],
-            shape=(_n_triangular_lower(n_channels),),
-            name="mixing_off_diag",
-        )
+        self.mixing_diag     = build_prior("mixing_diag",     mix_diag,     (n_channels,))
+        self.mixing_off_diag = build_prior("mixing_off_diag", mix_off_diag, (_n_triangular_lower(n_channels),))
         return (
             domain | self.mixing_diag.domain | self.mixing_off_diag.domain,
             init | self.mixing_diag.init | self.mixing_off_diag.init,
         )
 
     def _build_mixing_offset(self, n_channels, domain, init, mix_offset):
-        self.mixing_offset = jft.NormalPrior(
-            mix_offset[0],
-            mix_offset[1],
-            shape=(n_channels,),
-            name="mixing_offset",
-        )
+        self.mixing_offset = build_prior("mixing_offset", mix_offset, (n_channels,))
         return domain | self.mixing_offset.domain, init | self.mixing_offset.init
 
 

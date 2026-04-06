@@ -12,6 +12,7 @@ from astropy.wcs import WCS
 
 from astroprism.io import BaseDataset
 from astroprism.operators import Convolver, Reprojector
+from astroprism.models.priors import build_prior
 
 # === Main =========================================================================================
 
@@ -31,18 +32,16 @@ class InstrumentResponse:
         dataset: BaseDataset,
         signal_wcs: WCS,
         signal_shape: tuple[int, int],
-        psf_sigma: tuple[float, float] = (0.1, 0.05),
-        psf_rotation: tuple[float, float] = (0.0, 1.0),
+        psf_sigma: dict,
+        psf_rotation: dict,
         reproject_kwargs: dict | None = None,
         convolve_kwargs: dict | None = None,
     ):
         self.dataset = dataset
         self.signal_wcs = signal_wcs
         self.signal_shape = signal_shape
-        self.psf_sigma = jft.LogNormalPrior(psf_sigma[0], psf_sigma[1], shape=(dataset.n_channels,), name="psf_sigma")
-        self.psf_rotation = jft.NormalPrior(
-            psf_rotation[0], psf_rotation[1], shape=(dataset.n_channels,), name="psf_rotation"
-        )
+        self.psf_sigma    = build_prior("psf_sigma",    psf_sigma,    (dataset.n_channels,))
+        self.psf_rotation = build_prior("psf_rotation", psf_rotation, (dataset.n_channels,))
 
         reproject_kwargs = reproject_kwargs or {}
         convolve_kwargs = convolve_kwargs or {}
