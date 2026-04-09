@@ -10,7 +10,16 @@ import yaml
 from pathlib import Path
 from typing import Optional
 
-DEFAULT_CONFIG_PATH = Path(__file__).parent.parent.parent.parent / "configs" / "default.yaml"
+DEFAULT_CONFIG_PATH = Path(__file__).parent.parent / "configs" / "default.yaml"
+
+_DEFAULT_CACHE: dict | None = None
+
+def get_defaults() -> dict:
+    """Return the default config, cached after first load."""
+    global _DEFAULT_CACHE
+    if _DEFAULT_CACHE is None:
+        _DEFAULT_CACHE = yaml.safe_load(open(DEFAULT_CONFIG_PATH))
+    return _DEFAULT_CACHE
 
 # === Main =========================================================================================
 
@@ -34,7 +43,7 @@ def load_config(user_path: Optional[str | Path] = None) -> dict:
     cfg = load_config("configs/my_run.yaml")     # defaults + overrides
     cfg["inference"]["output_directory"] = "..."  # further overrides in-place
     """
-    cfg = yaml.safe_load(open(DEFAULT_CONFIG_PATH))
+    cfg = get_defaults().copy()
 
     if user_path is not None:
         user = yaml.safe_load(open(user_path))

@@ -12,6 +12,7 @@ import jax
 import jax.numpy as jnp
 import nifty8.re as jft
 from astroprism.models.priors import build_prior
+from astroprism.utils.config import get_defaults
 
 # === Main =========================================================================================
 
@@ -21,17 +22,24 @@ class SpatialGP(jft.Model):  # NOTE: other name may be 'GaussianRandomFields'
     def __init__(
         self,
         n_channels: int,
-        shape: tuple[int, ...],  # NOTE: Tuple[float, float] should be used for 2D images
+        shape: tuple[int, ...],
         distances: tuple[float, ...],
-        offset_mean: float = 0.0,  # NOTE: single float for now, does this need a tuple?
-        offset_std: tuple[float, float] = (1.0, 0.1),
-        fluctuations: tuple[float, float] = (1.0, 0.1),
-        loglogavgslope: tuple[float, float] = (-3.0, 1.0),
-        flexibility: tuple[float, float] = (0.5, 0.1),
+        offset_mean: float = None,
+        offset_std: tuple[float, float] = None,
+        fluctuations: tuple[float, float] = None,
+        loglogavgslope: tuple[float, float] = None,
+        flexibility: tuple[float, float] = None,
         asperity: tuple[float, float] | None = None,
         name: str = "",
         prefix: str = "",
     ):
+        gp = get_defaults()["gp"]
+        offset_mean    = offset_mean    if offset_mean    is not None else gp["offset_mean"]
+        offset_std     = offset_std     if offset_std     is not None else gp["offset_std"]
+        fluctuations   = fluctuations   if fluctuations   is not None else gp["fluctuations"]
+        loglogavgslope = loglogavgslope if loglogavgslope is not None else gp["loglogavgslope"]
+        flexibility    = flexibility    if flexibility    is not None else gp["flexibility"]
+
         correlated_fields = self._build_correlated_field(
             shape,
             distances,
@@ -149,6 +157,12 @@ class MixtureGP(jft.Model):
         init = self.spatial_gps.init
         n_channels = self.spatial_gps.n_channels
 
+        m = get_defaults()["mixture"]
+        mix_full     = mix_full     or m["mix_full"]
+        mix_offset   = mix_offset   or m["mix_offset"]
+        mix_diag     = mix_diag     or m.get("mix_diag")
+        mix_off_diag = mix_off_diag or m.get("mix_off_diag")
+
         if self.mix_mode == "full":
             domain, init = self._build_full_mixing_matrix(n_channels, domain, init, mix_full)
         elif self.mix_mode == "diag":
@@ -156,7 +170,7 @@ class MixtureGP(jft.Model):
         else:
             raise ValueError(f"Unknown mix_mode: {mix_mode}")
 
-        domain, init = self._build_mixing_offset(n_channels, domain, init, mix_offset)
+        domain, init = self._build_mixing_offset(n_channels, domain, init, mix_offset or m["mix_offset"])
         super().__init__(domain=domain, init=init)
 
     @property

@@ -8,6 +8,7 @@ from astroprism.io.dataset import (
     load_multiple_datasets,
 )
 from astroprism.io.preprocessing import append_psf_extension
+from astroprism.io.results import PosteriorResult
 
 __all__ = [
     "BaseDataset",
@@ -16,4 +17,5 @@ __all__ = [
     "append_psf_extension",
     "load_dataset",
     "load_multiple_datasets",
+    "PosteriorResult",
 ]
