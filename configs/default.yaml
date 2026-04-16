@@ -64,7 +64,7 @@ params:
     freeze_until: 0
 
   psf_sigma:
-    prior_type:   "lognormal"
+    prior_type:   "normal"
     prior_params: [1.0, 0.1]
     mode:         "point_estimate"
     freeze_until: 0

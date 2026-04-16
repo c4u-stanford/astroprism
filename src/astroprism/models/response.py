@@ -12,7 +12,7 @@ from astropy.wcs import WCS
 
 from astroprism.io import BaseDataset
 from astroprism.operators import Convolver, Reprojector
-from astroprism.models.priors import build_prior
+from astroprism.utils.priors import build_prior
 from astroprism.utils.config import get_defaults
 
 # === Main =========================================================================================
@@ -33,16 +33,16 @@ class InstrumentResponse:
         dataset: BaseDataset,
         signal_wcs: WCS,
         signal_shape: tuple[int, int],
-        psf_sigma: dict = None,
+        psf_smoothing: dict = None,
         psf_rotation: dict = None,
         reproject_kwargs: dict | None = None,
         convolve_kwargs: dict | None = None,
     ):
-        p = get_defaults()["params"]
+        p = get_defaults()["response"]
         self.dataset      = dataset
         self.signal_wcs   = signal_wcs
         self.signal_shape = signal_shape
-        self.psf_sigma    = build_prior("psf_sigma",    psf_sigma    or p["psf_sigma"],    (dataset.n_channels,))
+        self.psf_smoothing    = build_prior("psf_smoothing",    psf_smoothing    or p["psf_smoothing"],    (dataset.n_channels,))
         self.psf_rotation = build_prior("psf_rotation", psf_rotation or p["psf_rotation"], (dataset.n_channels,))
 
         reproject_kwargs = reproject_kwargs or {}
@@ -62,24 +62,24 @@ class InstrumentResponse:
     @property
     def domain(self) -> dict:
         """Domain of the internal priors"""
-        return self.psf_sigma.domain | self.psf_rotation.domain
+        return self.psf_smoothing.domain | self.psf_rotation.domain
 
     @property
     def init(self) -> dict:
         """Init of the internal priors"""
-        return self.psf_sigma.init | self.psf_rotation.init
+        return self.psf_smoothing.init | self.psf_rotation.init
 
     def __call__(self, x: dict, s: jnp.ndarray) -> list[jnp.ndarray]:
         # TODO: could have more inputs here
         """
         Args:
-            x: parameter dict from jft (contains psf_sigma, psf_rotation)
+            x: parameter dict from jft (contains psf_smoothing, psf_rotation)
             s: signal field, shape (n_channels, ny_signal, nx_signal)
         Returns:
             list of convolved/reprojected channels (ragged shapes allowed)
         """
         # Get parameters
-        psf_sigma = self.psf_sigma(x)
+        psf_smoothing = self.psf_smoothing(x)
         psf_rotation = self.psf_rotation(x)
 
         # Apply reprojectors and convolvers
@@ -93,7 +93,7 @@ class InstrumentResponse:
 
             # Convolve
             convolved_channel = self.convolvers[i](
-                reprojected_channel, kernel_sigma=psf_sigma[i], kernel_rotation=psf_rotation[i]
+                reprojected_channel, kernel_sigma=psf_smoothing[i], kernel_rotation=psf_rotation[i]
             )
 
             # Add to response

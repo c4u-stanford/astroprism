@@ -24,7 +24,8 @@ import yaml
 from astroprism.utils import load_config
 from astroprism.utils.masking import build_masks, save_masks
 from astroprism.io.dataset import load_dataset
-from astroprism.models.gp import SpatialGP, MixtureGP
+from astroprism.models.field import FieldModel
+from astroprism.models.signal import SignalModel
 from astroprism.models.response import InstrumentResponse
 from astroprism.models.noise import NoiseModel
 from astroprism.models.forward import ForwardModel
@@ -65,12 +66,12 @@ def main():
     distances    = pixel_scales[ref_idx]
 
     # 4. Build models
-    spatial_gp = SpatialGP(
+    spatial_gp = FieldModel(
         n_channels=dataset.n_channels,
         shape=signal_shape,
         distances=distances,
     )
-    gp_model = MixtureGP(spatial_gp)
+    signal_model = SignalModel(spatial_gp)
 
     response_model = InstrumentResponse(
         dataset=dataset,
@@ -79,7 +80,7 @@ def main():
     )
     noise_model   = NoiseModel(n_channels=dataset.n_channels)
     forward_model = ForwardModel(
-        gp_model=gp_model,
+        signal_model=signal_model,
         response_model=response_model,
         noise_model=noise_model,
     )
@@ -101,7 +102,7 @@ def main():
     likelihood = build_likelihood(dataset, forward_model, mask=mask)
 
     # 8. Build parameter schedule from config
-    constants, point_estimates = _build_schedule(cfg["params"])
+    constants, point_estimates = _build_schedule(cfg)
 
     # 9. Run inference
     inf_cfg = cfg["inference"]
@@ -161,31 +162,74 @@ def _save_run_artifacts(output_dir, cfg, dataset, signal_shape, distances, ref_i
         save_masks(holdout, os.path.join(output_dir, "mask.npz"))
 
 
-def _build_schedule(params_cfg: dict):
+def _build_schedule(cfg: dict):
     """
-    Build constants and point_estimates callables from the params config section.
+    Build constants and point_estimates callables from the full config.
 
-    Each param entry can have:
-      mode: sample | point_estimate | constant
-      freeze_until: N   (frozen as constant for iters 0..N-1, then transitions to mode)
+    Collects schedule info from gp, mixture, and params sections.
+    Each schedulable entry has:
+      constant_until: N        — in constants list for iters 0..N-1 (0 = never)
+      point_estimate_until: N  — in point_estimates list after constant phase
+                                 (0 = never, use 9999 for forever)
+
+    Progression: constant → point_estimate → fully sampled.
     """
+    # Collect all scheduled params: {domain_key: {constant_until, point_estimate_until}}
+    schedule = {}
+
+    # Field params — config key maps to domain key
+    field_cfg = cfg.get("field", {})
+    field_key_map = {
+        "offset_std": "zeromode",
+        "fluctuations": "fluctuations",
+        "loglogavgslope": "loglogavgslope",
+        "flexibility": "flexibility",
+    }
+    for cfg_key, domain_key in field_key_map.items():
+        entry = field_cfg.get(cfg_key, {})
+        if isinstance(entry, dict) and ("constant_until" in entry or "point_estimate_until" in entry):
+            schedule[domain_key] = entry
+
+    # Signal params — config key maps to domain key(s)
+    signal_cfg = cfg.get("signal", {})
+    mixing_mode = signal_cfg.get("mixing_mode", "full")
+    mixing_entry = signal_cfg.get("mixing_matrix", {})
+    if isinstance(mixing_entry, dict) and ("constant_until" in mixing_entry or "point_estimate_until" in mixing_entry):
+        if mixing_mode == "full":
+            schedule["mixing_matrix"] = mixing_entry
+        elif mixing_mode == "cholesky":
+            schedule["mixing_diag"] = mixing_entry
+            schedule["mixing_off_diag"] = mixing_entry
+    offset_entry = signal_cfg.get("mixing_offset", {})
+    if isinstance(offset_entry, dict) and ("constant_until" in offset_entry or "point_estimate_until" in offset_entry):
+        schedule["mixing_offset"] = offset_entry
+
+    # Response params — config key == domain key
+    for name, entry in cfg.get("response", {}).items():
+        if isinstance(entry, dict):
+            schedule[name] = entry
+
+    # Noise params — config key == domain key
+    for name, entry in cfg.get("noise", {}).items():
+        if isinstance(entry, dict):
+            schedule[name] = entry
 
     def constants(i: int) -> tuple:
         frozen = []
-        for name, p in params_cfg.items():
-            mode         = p.get("mode", "sample")
-            freeze_until = p.get("freeze_until", 0)
-            if mode == "constant" or (freeze_until > 0 and i < freeze_until):
+        for name, p in schedule.items():
+            cu = p.get("constant_until", 0)
+            if cu > 0 and i < cu:
                 frozen.append(name)
         return tuple(frozen)
 
     def point_estimates(i: int) -> tuple:
         pe = []
-        for name, p in params_cfg.items():
-            mode         = p.get("mode", "sample")
-            freeze_until = p.get("freeze_until", 0)
-            # Only active as point_estimate once past freeze_until
-            if mode == "point_estimate" and i >= freeze_until:
+        for name, p in schedule.items():
+            cu  = p.get("constant_until", 0)
+            peu = p.get("point_estimate_until", 0)
+            if i < cu:
+                continue
+            if peu > 0 and i < peu:
                 pe.append(name)
         return tuple(pe)
 

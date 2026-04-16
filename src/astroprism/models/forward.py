@@ -27,22 +27,22 @@ class ForwardModel(jft.Model):
 
     def __init__(
         self,
-        gp_model: jft.Model,  # NOTE: could also call signal/source/sky/latent model?
+        signal_model: jft.Model,  # NOTE: could also call signal/source/sky/latent model?
         response_model: jft.Model,
         noise_model: jft.Model,
     ):
-        self.gp_model = gp_model
+        self.signal_model = signal_model
         self.response_model = response_model
         self.noise_model = noise_model
 
-        domain = gp_model.domain | response_model.domain | noise_model.domain
-        init = gp_model.init | response_model.init | noise_model.init
+        domain = signal_model.domain | response_model.domain | noise_model.domain
+        init = signal_model.init | response_model.init | noise_model.init
 
         super().__init__(domain=domain, init=init)
 
     def __call__(self, x: dict) -> tuple[jnp.ndarray, jnp.ndarray]:
         # 1. Generate latent signal s from GP parameters
-        s = self.gp_model(x)
+        s = self.signal_model(x)
 
         # 2. Apply instrument response (needs parameters + signal)
         r = self.response_model(x, s)

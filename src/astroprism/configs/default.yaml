@@ -7,6 +7,13 @@
 # Prior params format:
 #   Shared across all channels:  [mean, std]
 #   Per-channel:                 [[mean, std], [mean, std], ...]
+#
+# Schedule (maps directly to NIFTy's constants / point_estimates):
+#   constant_until: N        — frozen for iters 0..N-1 (0 = never frozen)
+#   point_estimate_until: N  — MAP-estimated for iters constant_until..N-1
+#                              (0 = never point estimate)
+#   Use a large number (e.g. 9999) to stay in a phase forever.
+#   Progression: constant → point_estimate → fully sampled
 # =============================================================================
 
 # ── Data ──────────────────────────────────────────────────────────────────────
@@ -15,67 +22,79 @@ data:
   instrument: null          # e.g. JWST_MIRI, JWST_NIRCAM, HERSCHEL_PACS
   extension:  "fits"
 
-# ── GP prior (shared spatial structure across channels) ───────────────────────
-gp:
-  offset_mean:    0.0
-  offset_std:     [1.0,  0.1]   # zero-mode prior
-  fluctuations:   [1.0,  0.1]   # amplitude of spatial fluctuations
-  loglogavgslope: [-3.0, 1.0]   # power-law slope of the power spectrum
-  flexibility:    [0.5,  0.1]   # deviation from pure power law
-
-# ── Mixing matrix (cross-channel correlations) ────────────────────────────────
-mixture:
-  mix_mode: "full"              # "full" or "diag"
-  mix_full:
-    prior_type:   "normal"
-    prior_params: [0.0, 1.0]
-  mix_offset:
-    prior_type:   "normal"
-    prior_params: [0.0, 1.0]
-  # Used only when mix_mode: "diag"
-  mix_diag:
-    prior_type:   "normal"
-    prior_params: [0.0, 1.0]
-  mix_off_diag:
-    prior_type:   "normal"
-    prior_params: [0.0, 1.0]
-
-# ── Per-channel learnable params ──────────────────────────────────────────────
+# ── Field (latent correlated fields) ─────────────────────────────────────────
 #
-# mode options:
-#   sample         — full posterior (default)
-#   point_estimate — MAP estimate, not sampled
-#   constant       — frozen at init value
-#
-# freeze_until: N  — frozen as constant for iters 0..N-1, then transitions to mode
-# freeze_until: 0  — never frozen (active from iter 0)
+# Prior types fixed by NIFTy: lognormal for fluctuations/flexibility,
+# normal for loglogavgslope. Only prior_params can be changed.
+# Domain keys: zeromode, fluctuations, loglogavgslope, flexibility, spectrum, xi
 # =============================================================================
-params:
-  background_std:
-    prior_type:   "lognormal"
-    prior_params: [0.01, 0.1]   # broadcast to all channels
-    mode:         "sample"
-    freeze_until: 0
+field:
+  offset_mean:    0.0
+  offset_std:
+    prior_params: [1.0, 0.1]
+    constant_until: 0
+    point_estimate_until: 0
+  fluctuations:
+    prior_params: [1.0, 0.1]
+    constant_until: 0
+    point_estimate_until: 0
+  loglogavgslope:
+    prior_params: [-3.0, 1.0]
+    constant_until: 0
+    point_estimate_until: 0
+  flexibility:
+    prior_params: [0.5, 0.1]
+    constant_until: 0
+    point_estimate_until: 0
 
-  poisson_scale:
-    prior_type:   "lognormal"
-    prior_params: [1.0, 0.5]
-    mode:         "sample"
-    freeze_until: 0
+# ── Signal (mixing + activation) ─────────────────────────────────────────────
+#
+# Domain keys: mixing_matrix (full) or mixing_diag + mixing_off_diag (cholesky),
+#              mixing_offset
+# =============================================================================
+signal:
+  activation: "exp"             # exp | softplus | sigmoid | identity | relu | square
+  mixing_mode: "full"           # "full" or "cholesky"
+  mixing_matrix:
+    prior_type:   "normal"
+    prior_params: [0.0, 1.0]
+    constant_until: 0
+    point_estimate_until: 0
+  mixing_offset:
+    prior_type:   "normal"
+    prior_params: [0.0, 1.0]
+    constant_until: 0
+    point_estimate_until: 0
 
-  psf_sigma:
+# ── Response (instrument response) ───────────────────────────────────────────
+response:
+  psf_smoothing:
     prior_type:   "lognormal"
     prior_params: [1.0, 0.1]
-    mode:         "point_estimate"
-    freeze_until: 0
+    constant_until:       0
+    point_estimate_until: 9999   # MAP forever
 
   psf_rotation:
     prior_type:   "normal"
     prior_params: [0.0, 0.1]
-    mode:         "point_estimate"
-    freeze_until: 0
+    constant_until:       0
+    point_estimate_until: 9999   # MAP forever
 
-# ── PPC masking (posterior predictive checks) ─────────────────────────────────
+# ── Noise ─────────────────────────────────────────────────────────────────────
+noise:
+  noise_floor:
+    prior_type:   "lognormal"
+    prior_params: [0.01, 0.1]   # broadcast to all channels
+    constant_until:       5      # frozen for first 5 iters
+    point_estimate_until: 9999   # MAP forever after unfreezing
+
+  noise_scale:
+    prior_type:   "lognormal"
+    prior_params: [0.01, 0.1]
+    constant_until:       9999   # frozen forever
+    point_estimate_until: 0
+
+# ── Masking (held-out validation) ─────────────────────────────────────────────
 #
 # Strategy syntax per channel:
 #   null              — no masking

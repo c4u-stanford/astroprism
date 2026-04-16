@@ -13,7 +13,8 @@ import jax.numpy as jnp
 import numpy as np
 import yaml
 
-from astroprism.models.gp import SpatialGP, MixtureGP
+from astroprism.models.field import FieldModel
+from astroprism.models.signal import SignalModel
 from astroprism.models.response import InstrumentResponse
 from astroprism.models.noise import NoiseModel
 from astroprism.models.forward import ForwardModel
@@ -87,16 +88,15 @@ class PosteriorResult:
 
     # === Model reconstruction ====================================================================
 
-    def build_gp_model(self) -> MixtureGP:
-        """Reconstruct the GP model from saved config (no dataset needed)."""
+    def build_signal_model(self) -> SignalModel:
+        """Reconstruct the signal model from saved config (no dataset needed)."""
         d = self.derived
-        cfg = self.config
-        spatial_gp = SpatialGP(
+        spatial_gp = FieldModel(
             n_channels=d["n_channels"],
             shape=tuple(d["signal_shape"]),
             distances=tuple(d["distances"]),
         )
-        return MixtureGP(spatial_gp)
+        return SignalModel(spatial_gp)
 
     def build_response_model(self, dataset=None) -> InstrumentResponse:
         """Reconstruct the instrument response model (needs dataset for WCS/PSFs)."""
@@ -116,7 +116,7 @@ class PosteriorResult:
     def build_forward_model(self, dataset=None) -> ForwardModel:
         """Reconstruct the full forward model."""
         return ForwardModel(
-            gp_model=self.build_gp_model(),
+            signal_model=self.build_signal_model(),
             response_model=self.build_response_model(dataset),
             noise_model=self.build_noise_model(),
         )
@@ -131,7 +131,7 @@ class PosteriorResult:
         """
         if samples is None:
             samples, _ = self.load_samples()
-        gp = self.build_gp_model()
+        gp = self.build_signal_model()
         return [jnp.array(gp(s.tree)) for s in samples]
 
     def predict_response(self, samples=None, dataset=None) -> list[list[jnp.ndarray]]:
@@ -142,7 +142,7 @@ class PosteriorResult:
         """
         if samples is None:
             samples, _ = self.load_samples()
-        gp = self.build_gp_model()
+        gp = self.build_signal_model()
         response = self.build_response_model(dataset)
         results = []
         for s in samples:
@@ -159,7 +159,7 @@ class PosteriorResult:
         """
         if samples is None:
             samples, _ = self.load_samples()
-        gp = self.build_gp_model()
+        gp = self.build_signal_model()
         response = self.build_response_model(dataset)
         noise = self.build_noise_model()
         results = []
